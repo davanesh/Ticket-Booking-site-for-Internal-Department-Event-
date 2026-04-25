@@ -71,3 +71,28 @@ export const sendTicketEmail = async (toEmail, event, ticket) => {
         return false;
     }
 }
+
+export const sendCancellationEmail = async (toEmail, event, ticket) => {
+    try {
+        const mailOptions = {
+            from: `"College Events" <${process.env.EMAIL_USER || 'no-reply@college.edu'}>`,
+            to: toEmail,
+            subject: `Ticket Cancelled for ${event.title}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px; border-radius: 10px;">
+                    <h1 style="color: #ff00ff;">Cancellation Confirmed</h1>
+                    <p style="font-size: 16px;">Hello,</p>
+                    <p style="font-size: 16px;">Your ticket (ID: ${ticket.id}) for <strong>${event.title}</strong> has been successfully cancelled as requested.</p>
+                    <p style="font-size: 14px; color: #aaaaaa;">We hope to see you at another event soon.</p>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log("Cancellation Message sent: %s", info.messageId);
+        return true;
+    } catch (error) {
+        console.error('Email send failed:', error);
+        return false;
+    }
+}

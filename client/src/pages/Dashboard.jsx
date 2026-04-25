@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket } from 'lucide-react';
+import NotificationModal from '../components/NotificationModal';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const Dashboard = ({ user }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState(null);
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
 
   useEffect(() => {
     const fetchMyTickets = async () => {
@@ -26,6 +30,34 @@ const Dashboard = ({ user }) => {
     };
     fetchMyTickets();
   }, [user]);
+
+  const handleCancel = async () => {
+    const ticketId = confirmCancelId;
+    setConfirmCancelId(null);
+    if (!ticketId) return;
+
+    try {
+      const idToken = await user.getIdToken();
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/tickets/cancel/${ticketId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setNotification({ type: 'success', message: "Ticket cancelled. A confirmation email has been dispatched." });
+        setTickets(tickets.filter(t => t.id !== ticketId));
+      } else {
+        setNotification({ type: 'error', message: data.error || 'Cancellation failed' });
+      }
+    } catch (err) {
+      console.error(err);
+      setNotification({ type: 'error', message: 'An error occurred connecting to the server.' });
+    }
+  };
 
   if (!user) {
     return (
@@ -65,9 +97,16 @@ const Dashboard = ({ user }) => {
                   <p style={{ fontSize: '1.1rem', letterSpacing: '2px', fontWeight: 'bold' }}>{tkt.id}</p>
                 </div>
                 
-                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status:</span>
+                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', color: '#00ff00' }}>Confirmed</span>
+                  <button 
+                    onClick={() => setConfirmCancelId(tkt.id)} 
+                    style={{ background: 'transparent', border: '1px solid var(--accent-pink)', color: 'var(--accent-pink)', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.3s' }}
+                    onMouseOver={(e) => { e.target.style.background = 'var(--accent-pink)'; e.target.style.color = '#fff' }}
+                    onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--accent-pink)' }}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             ))
@@ -80,6 +119,22 @@ const Dashboard = ({ user }) => {
             </div>
           )}
         </div>
+      )}
+
+      {confirmCancelId && (
+        <ConfirmationModal 
+          message="This action cannot be undone. Are you sure you want to forfeit this ticket and lose your spot at the event?"
+          onConfirm={handleCancel}
+          onCancel={() => setConfirmCancelId(null)}
+        />
+      )}
+
+      {notification && (
+        <NotificationModal 
+          type={notification.type} 
+          message={notification.message} 
+          onClose={() => setNotification(null)} 
+        />
       )}
     </div>
   );

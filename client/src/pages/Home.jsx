@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import HeroSection from '../components/HeroSection';
 import EventCard from '../components/EventCard';
+import NotificationModal from '../components/NotificationModal';
 
 const Home = ({ user }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState(null);
 
   // Fetch Events from API
   useEffect(() => {
@@ -25,7 +27,7 @@ const Home = ({ user }) => {
 
   const handleBook = async (event) => {
     if (!user) {
-      alert("Please login first to book tickets!");
+      setNotification({ type: 'error', message: "Please login first to book tickets!" });
       return;
     }
 
@@ -43,16 +45,16 @@ const Home = ({ user }) => {
 
       const data = await response.json();
       if (response.ok) {
-        alert("Booking successful! Check your email and Dashboard.");
+        setNotification({ type: 'success', message: "Booking successful! Your ticket confirmation has been sent to your email." });
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const res = await fetch(`${apiUrl}/api/events`);
         setEvents(await res.json());
       } else {
-        alert(data.error || 'Booking failed');
+        setNotification({ type: 'error', message: data.error || 'Booking failed' });
       }
     } catch (err) {
       console.error(err);
-      alert('An error occurred');
+      setNotification({ type: 'error', message: 'An error occurred connecting to the server.' });
     }
   };
 
@@ -84,6 +86,14 @@ const Home = ({ user }) => {
           </div>
         )}
       </section>
+
+      {notification && (
+        <NotificationModal 
+          type={notification.type} 
+          message={notification.message} 
+          onClose={() => setNotification(null)} 
+        />
+      )}
     </div>
   );
 };

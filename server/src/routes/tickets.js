@@ -4,7 +4,7 @@ import Ticket from '../models/Ticket.js';
 import Event from '../models/Event.js';
 import User from '../models/User.js';
 import { verifyToken } from '../middleware/auth.js';
-import { sendTicketEmail } from '../services/email.js';
+import { sendTicketEmail, sendCancellationEmail } from '../services/email.js';
 import sequelize from '../config/db.js';
 
 const router = express.Router();
@@ -93,6 +93,47 @@ router.get('/my-tickets', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Fetch tickets error:', error);
     res.status(500).json({ error: 'Server error fetching tickets' });
+  }
+});
+
+// DELETE /api/tickets/cancel/:ticketId : Cancel a ticket
+router.delete('/cancel/:ticketId', verifyToken, async (req, res) => {
+  const { ticketId } = req.params;
+  const decodedFirebaseUser = req.user;
+
+  try {
+    const result = await sequelize.transaction(async (t) => {
+      const user = await User.findOne({ where: { firebaseUid: decodedFirebaseUser.uid }, transaction: t });
+      if (!user) throw new Error('User not found');
+
+      const ticket = await Ticket.findOne({
+        where: { id: ticketId, userId: user.id },
+        include: [{ model: Event, lock: true }],
+        transaction: t,
+        lock: true
+      });
+
+      if (!ticket) throw new Error('Ticket not found or unauthorized');
+
+      const event = ticket.Event;
+      
+      if (event.ticketsBooked > 0) {
+        event.ticketsBooked -= 1;
+        await event.save({ transaction: t });
+      }
+
+      await ticket.destroy({ transaction: t });
+      return { user, event, ticket };
+    });
+
+    sendCancellationEmail(result.user.email, result.event, result.ticket).catch(err => console.log('Mail error:', err));
+    res.json({ message: 'Ticket cancelled successfully' });
+  } catch (error) {
+    if (error.message === 'Ticket not found or unauthorized' || error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    console.error('Cancellation error:', error);
+    res.status(500).json({ error: 'Server error cancelling ticket' });
   }
 });
 
