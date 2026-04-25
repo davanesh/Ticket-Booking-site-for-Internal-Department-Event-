@@ -39,7 +39,6 @@ function BookingForm({
               {field.label}
             </label>
 
-            {/* 🔥 Conditional Rendering */}
             {field.name === "department" ? (
               <select
                 id={field.name}
